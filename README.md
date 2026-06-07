@@ -22,3 +22,10 @@ positives left by the previous one:
    version. Cropping to the lower half removes the eye/forehead matches
    structurally, and the high `minNeighbors` keeps only strongly confirmed
    detections.
+
+4. **Keep only the largest smile box per face** — after step 3 the smile was
+   detected correctly, but the detector still returned several overlapping
+   rectangles for the same mouth (a smaller box nested inside the correct one).
+   Since a face has only one mouth, the code now picks the single largest
+   detection by area (`max(smiles, key=lambda r: r[2] * r[3])`) and draws just
+   that one.

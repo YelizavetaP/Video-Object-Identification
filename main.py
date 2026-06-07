@@ -90,8 +90,10 @@ while True:
         # repeated detections, filtering out the noisy false positives.
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.7, minNeighbors=22)
 
-        # Draw a rectangle around the smile (relative to the face ROI)
-        for (sx,sy,sw,sh) in smiles:
+        # A face has only one mouth, but the detector can return several
+        # overlapping boxes for it. Keep just the largest one and draw it.
+        if len(smiles) > 0:
+            sx, sy, sw, sh = max(smiles, key=lambda r: r[2] * r[3])
             cv2.rectangle(roi_color, (sx,sy), (sx+sw,sy+sh), (0,0,255), 2)
 
     # Display the output
