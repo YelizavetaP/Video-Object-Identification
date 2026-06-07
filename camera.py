@@ -2,25 +2,10 @@
 
 '''
 
-Ідентифікація облич на потоковому відео
+Face / profile / smile detection on the live laptop camera with Haar cascades.
 
-алгоритм ідентифікації "каскади Хаара":
- - класифікатор Хаара - ієрархічна множина простих вирішувачів - як сума та різниця підобластей зображення;
- - надмірність даних - потокове відео, класифікатор Хаара - вважається вже сформованим;
- - каскади Хаара складаються з множини "цифрових автоматів" що побудовані в ієрархію структур "дерево";
- - класифікатор на кінцевому прошарку  має образ (образи) із часткових ознак;
- - зображення описується множиною частковимих ознак;
- - процес ідентифікації: порівняння множини ознак на прошарках для віднесення обєкту до найближчого образа.
-
-Prateek Joshi Artificial Intelligence applications with Python, Part 13:
-https://mazz.keybase.pub/ebooks/ai/9781786464392-ARTIFICIAL_INTELLIGENCE_WITH_PYTHON.pdf
-Scripts:
-https://github.com/PacktPublishing/Artificial-Intelligence-with-Python
-
-Package            Version
------------------- -----------
-opencv-python      3.4.18.65
-
+Same detection logic as main.py, but the video source is the webcam instead of
+a file. Press 'Esc' to quit.
 
 '''
 
@@ -28,9 +13,8 @@ import os
 import cv2
 
 _here = os.path.dirname(os.path.abspath(__file__))
-_media = os.path.join(_here, 'media')
 
-# Load the Haar cascade files for the face and the smile.
+# Load the Haar cascade files for the face, the profile and the smile.
 # The smile cascade is trained to find a mouth inside an already-cropped face,
 # so it must run on a face ROI -- never on the whole frame, or it fires on
 # eyes, nostrils and other mouth-like patterns and draws false boxes.
@@ -64,25 +48,32 @@ def overlaps(a, b, threshold=0.3):
         return False
     return inter / min(aw * ah, bw * bh) > threshold
 
-# Initialize the video capture object from the webcam
-# cap = cv2.VideoCapture(0)
 
-# Initialize the video capture object
-cap = cv2.VideoCapture(os.path.join(_media, 'smile2.mp4'))
-# cap = cv2.VideoCapture(0)
+# Initialize the video capture object from the laptop camera.
+# CAP_DSHOW is the DirectShow backend, which opens the webcam faster on Windows.
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+# Make sure the camera actually opened
+if not cap.isOpened():
+    raise IOError('Unable to open the laptop camera')
 
 # Define the scaling factor
-scaling_factor = 0.5
+scaling_factor = 1.0
 
 # Iterate until the user hits the 'Esc' key
 while True:
     # Capture the current frame
-    _, frame = cap.read()
+    ret, frame = cap.read()
+
+    # A camera can drop frames; skip the iteration if no frame was returned
+    if not ret:
+        continue
 
     # Resize the frame
-    frame = cv2.resize(frame, None, 
-            fx=scaling_factor, fy=scaling_factor, 
-            interpolation=cv2.INTER_AREA)
+    if scaling_factor != 1.0:
+        frame = cv2.resize(frame, None,
+                fx=scaling_factor, fy=scaling_factor,
+                interpolation=cv2.INTER_AREA)
 
     # Convert to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -119,17 +110,17 @@ while True:
     '''
 
     # The profile cascade is trained for one side only (right-facing faces),
-    # so it would miss the man when he turns the other way. Run it once on the
-    # frame and once on a horizontally flipped copy, then map the flipped
-    # detections back to the original coordinates.
+    # so it would miss a face turned the other way. Run it once on the frame
+    # and once on a horizontally flipped copy, then map the flipped detections
+    # back to the original coordinates.
     profiles = list(profile_cascade.detectMultiScale(gray, 1.3, 5))
     frame_width = gray.shape[1]
     for (px,py,pw,ph) in profile_cascade.detectMultiScale(cv2.flip(gray, 1), 1.3, 5):
         profiles.append((frame_width - px - pw, py, pw, ph))
 
     # Draw a rectangle around each profile face in a different colour (blue).
-    # Frontal detection is more reliable, so when the man faces the camera and
-    # the profile cascade fires on the same face, skip it -- the frontal box
+    # Frontal detection is more reliable, so when the face is head-on and the
+    # profile cascade fires on the same face, skip it -- the frontal box
     # already covers it.
     for (px,py,pw,ph) in profiles:
         if any(overlaps((px,py,pw,ph), f) for f in face_rects):
@@ -137,7 +128,7 @@ while True:
         cv2.rectangle(frame, (px,py), (px+pw,py+ph), (255,0,0), 3)
 
     # Display the output
-    cv2.imshow('Face Detector', frame)
+    cv2.imshow('Face Detector (camera)', frame)
 
     # Check if the user hit the 'Esc' key
     c = cv2.waitKey(1)
